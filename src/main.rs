@@ -12,6 +12,32 @@ fn count_bytes(data: &[u8]) -> HashMap<u8, usize> {
     counts
 }
 
+struct Node {
+    kind: NodeType,
+    weight: usize,
+}
+
+impl Node {
+    fn new_leaf(byte: u8, weight: usize) -> Self {
+        Node {
+            kind: NodeType::Leaf(byte),
+            weight,
+        }
+    }
+
+    fn merge(left: Node, right: Node) -> Self {
+        Node {
+            weight: left.weight + right.weight,
+            kind: NodeType::Internal(Some(Box::new(left)), Some(Box::new(right))),
+        }
+    }
+}
+
+enum NodeType {
+    Internal(Option<Box<Node>>, Option<Box<Node>>),
+    Leaf(u8),
+}
+
 #[cfg(test)]
 mod test {
     use crate::*;
@@ -32,5 +58,14 @@ mod test {
         assert_eq!(counts.get(&0), Some(&1));
         assert_eq!(counts.get(&1), Some(&1));
         assert_eq!(counts.get(&7), Some(&1));
+    }
+
+    #[test]
+    fn merge_two_leaves() {
+        let left = Node::new_leaf(3, 5);
+        let right = Node::new_leaf(5, 1);
+        let merged = Node::merge(left, right);
+        assert_eq!(merged.weight, 6);
+        assert_eq!(matches!(merged.kind, NodeType::Internal(_, _)), true);
     }
 }
