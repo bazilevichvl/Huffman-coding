@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BinaryHeap, HashMap};
 
 fn main() {
     println!("Hello, world!");
@@ -31,11 +31,75 @@ impl Node {
             kind: NodeType::Internal(Some(Box::new(left)), Some(Box::new(right))),
         }
     }
+
+    fn lookup_table(&self) -> HashMap<u8, String> {
+        let mut table = HashMap::new();
+        self.lookup_table_rec(&mut table, "".to_owned());
+
+        table
+    }
+
+    fn lookup_table_rec(&self, table: &mut HashMap<u8, String>, prefix: String) {
+        match self.kind {
+            NodeType::Leaf(byte) => {
+                table.insert(byte, prefix);
+            }
+            NodeType::Internal(Some(ref left), Some(ref right)) => {
+                left.lookup_table_rec(table, prefix.clone() + "0");
+                right.lookup_table_rec(table, prefix + "1");
+            }
+            // Due to construction algorithm internal node always has exactly
+            // childs
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl std::cmp::PartialEq for Node {
+    fn eq(&self, other: &Self) -> bool {
+        self.weight == other.weight
+    }
+}
+
+impl std::cmp::Eq for Node {}
+
+impl std::cmp::PartialOrd for Node {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl std::cmp::Ord for Node {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        other.weight.cmp(&self.weight)
+    }
 }
 
 enum NodeType {
     Internal(Option<Box<Node>>, Option<Box<Node>>),
     Leaf(u8),
+}
+
+fn build_huffman_codes_tree(counts: HashMap<u8, usize>) -> Result<Node, String> {
+    if counts.keys().len() <= 2 {
+        return Err(
+            "It makes no sense to use Huffman coding for less than three symbols".to_owned(),
+        );
+    }
+
+    let mut trees = BinaryHeap::new();
+    for (symbol, weight) in counts {
+        let root = Node::new_leaf(symbol, weight);
+        trees.push(root);
+    }
+
+    while trees.len() > 1 {
+        let left = trees.pop().unwrap();
+        let right = trees.pop().unwrap();
+        trees.push(Node::merge(left, right));
+    }
+
+    Ok(trees.pop().unwrap())
 }
 
 #[cfg(test)]
@@ -67,5 +131,33 @@ mod test {
         let merged = Node::merge(left, right);
         assert_eq!(merged.weight, 6);
         assert_eq!(matches!(merged.kind, NodeType::Internal(_, _)), true);
+    }
+
+    #[test]
+    fn huffman_codes_construction_fails_for_one_symbol() {
+        let mut counts = HashMap::new();
+        counts.insert(42, 1);
+        assert_eq!(matches!(build_huffman_codes_tree(counts), Err(_)), true);
+    }
+
+    #[test]
+    fn huffman_codes_construction_fails_for_two_symbols() {
+        let mut counts = HashMap::new();
+        counts.insert(42, 1);
+        counts.insert(3, 5);
+        assert_eq!(matches!(build_huffman_codes_tree(counts), Err(_)), true);
+    }
+
+    #[test]
+    fn huffman_codes_are_no_longer_than_two_for_symbols_in_word_test() {
+        let data = vec![b't', b'e', b's', b't'];
+        let counts = count_bytes(&data);
+
+        let root = build_huffman_codes_tree(counts).unwrap();
+        let table = root.lookup_table();
+
+        assert_eq!(table.get(&b't').unwrap().len(), 1);
+        assert_eq!(table.get(&b'e').unwrap().len(), 2);
+        assert_eq!(table.get(&b's').unwrap().len(), 2);
     }
 }
