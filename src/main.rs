@@ -14,11 +14,14 @@ fn main() {
     let input = RawFile::new(args.input_file);
     let raw_size = input.size();
     println!("Raw file size: {} bits", raw_size);
-    let encoded = encode(input);
+    let encoded = encode(&input);
     let encoded_size = encoded.size();
     println!("Encoded file size: {} bits", encoded_size);
 
-    println!("Compression ratio: {:.3}", raw_size as f64 / encoded_size as f64);
+    println!(
+        "Compression ratio: {:.3}",
+        raw_size as f64 / encoded_size as f64
+    );
 }
 
 fn count_bytes(data: &[u8]) -> HashMap<u8, usize> {
@@ -140,13 +143,13 @@ impl EncodedFile {
     }
 }
 
-fn encode(file: RawFile) -> EncodedFile {
+fn encode(file: &RawFile) -> EncodedFile {
     let counts = count_bytes(&file.0);
     let huffman_tree = build_huffman_codes_tree(counts).unwrap();
     let codes = huffman_tree.lookup_table();
     let mut encoded_content = String::new();
-    for symbol in file.0 {
-        encoded_content.push_str(codes.get(&symbol).unwrap());
+    for symbol in &file.0 {
+        encoded_content.push_str(codes.get(symbol).unwrap());
     }
 
     EncodedFile(codes, encoded_content)
