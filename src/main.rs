@@ -1,7 +1,24 @@
+use clap::Parser;
 use std::collections::{BinaryHeap, HashMap};
 
+#[derive(Parser)]
+#[clap(author, version, about, long_about = None)]
+struct Args {
+    #[clap(short, long)]
+    input_file: String,
+}
+
 fn main() {
-    println!("Hello, world!");
+    let args = Args::parse();
+
+    let input = RawFile::new(args.input_file);
+    let raw_size = input.size();
+    println!("Raw file size: {} bits", raw_size);
+    let encoded = encode(input);
+    let encoded_size = encoded.size();
+    println!("Encoded file size: {} bits", encoded_size);
+
+    println!("Compression ratio: {:.3}", raw_size as f64 / encoded_size as f64);
 }
 
 fn count_bytes(data: &[u8]) -> HashMap<u8, usize> {
@@ -100,6 +117,39 @@ fn build_huffman_codes_tree(counts: HashMap<u8, usize>) -> Result<Node, String> 
     }
 
     Ok(trees.pop().unwrap())
+}
+
+struct RawFile(Vec<u8>);
+
+impl RawFile {
+    fn new(path: String) -> Self {
+        let content = std::fs::read(path).expect("Can't read input file");
+        Self(content)
+    }
+
+    fn size(&self) -> usize {
+        self.0.len() * 8
+    }
+}
+
+struct EncodedFile(HashMap<u8, String>, String);
+
+impl EncodedFile {
+    fn size(&self) -> usize {
+        self.1.len()
+    }
+}
+
+fn encode(file: RawFile) -> EncodedFile {
+    let counts = count_bytes(&file.0);
+    let huffman_tree = build_huffman_codes_tree(counts).unwrap();
+    let codes = huffman_tree.lookup_table();
+    let mut encoded_content = String::new();
+    for symbol in file.0 {
+        encoded_content.push_str(codes.get(&symbol).unwrap());
+    }
+
+    EncodedFile(codes, encoded_content)
 }
 
 #[cfg(test)]
